@@ -11,6 +11,18 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Critical inline styles so the dark theme is applied instantly,
+            even before the Tailwind bundle loads (avoids an unstyled flash
+            on Render cold starts). */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html:
+              "html,body{margin:0;background:#0f1117;color:#f5f5f5;" +
+              "font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;}",
+          }}
+        />
+      </head>
       <body className="antialiased">{children}</body>
     </html>
   );

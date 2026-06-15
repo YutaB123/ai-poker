@@ -60,26 +60,39 @@ export default function HomePage() {
   const [log, setLog] = useState<LogEntry[]>([]);
   const logIdRef = useRef(0);
 
-  // Load catalog
+  // Load catalog (retry through cold starts so we never get stuck loading)
   useEffect(() => {
-    fetch("/api/catalog")
-      .then((r) => r.json())
-      .then((j: { models: ModelDescriptor[] }) => {
-        setCatalog(j.models);
-        // Default seat assignments — rotate through catalog
-        const defaults: SeatConfig[] = [];
-        for (let i = 0; i < SEAT_COUNT; i++) {
-          const m = j.models[i % j.models.length];
-          defaults.push({
-            provider: m.provider,
-            model: m.model,
-            brandColor: m.brandColor,
-            modelLabel: m.label,
-            name: shortLabel(m.label),
-          });
+    let cancelled = false;
+    (async () => {
+      for (let attempt = 0; attempt < 8 && !cancelled; attempt++) {
+        try {
+          const res = await fetch("/api/catalog");
+          if (!res.ok) throw new Error(`status ${res.status}`);
+          const j = (await res.json()) as { models: ModelDescriptor[] };
+          if (!j.models?.length) throw new Error("empty catalog");
+          if (cancelled) return;
+          setCatalog(j.models);
+          const defaults: SeatConfig[] = [];
+          for (let i = 0; i < SEAT_COUNT; i++) {
+            const m = j.models[i % j.models.length];
+            defaults.push({
+              provider: m.provider,
+              model: m.model,
+              brandColor: m.brandColor,
+              modelLabel: m.label,
+              name: shortLabel(m.label),
+            });
+          }
+          setSeats(defaults);
+          return;
+        } catch {
+          await new Promise((r) => setTimeout(r, 1500));
         }
-        setSeats(defaults);
-      });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function pushLog(text: string, tone?: LogEntry["tone"]) {
@@ -355,36 +368,43 @@ export default function HomePage() {
           Six AI models, five-card draw, no buy-in for humans. Pick your seats and watch them play.
         </p>
 
-        <div className="space-y-2 mb-6">
-          {seats.map((s, i) => (
-            <ModelPicker
-              key={i}
-              seat={i}
-              catalog={catalog}
-              value={{ provider: s.provider, model: s.model }}
-              name={s.name}
-              onNameChange={(n) =>
-                setSeats((prev) => prev.map((p, idx) => (idx === i ? { ...p, name: n } : p)))
-              }
-              onModelChange={(m) =>
-                setSeats((prev) =>
-                  prev.map((p, idx) =>
-                    idx === i
-                      ? {
-                          ...p,
-                          provider: m.provider,
-                          model: m.model,
-                          brandColor: m.brandColor,
-                          modelLabel: m.label,
-                          name: p.name && p.name !== prev[idx].name ? p.name : shortLabel(m.label),
-                        }
-                      : p
+        {catalog.length === 0 || seats.length === 0 ? (
+          <div className="flex items-center gap-3 text-neutral-400 py-12 justify-center">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 dot-pulse" />
+            Loading models… (the server may be waking up)
+          </div>
+        ) : (
+          <div className="space-y-2 mb-6">
+            {seats.map((s, i) => (
+              <ModelPicker
+                key={i}
+                seat={i}
+                catalog={catalog}
+                value={{ provider: s.provider, model: s.model }}
+                name={s.name}
+                onNameChange={(n) =>
+                  setSeats((prev) => prev.map((p, idx) => (idx === i ? { ...p, name: n } : p)))
+                }
+                onModelChange={(m) =>
+                  setSeats((prev) =>
+                    prev.map((p, idx) =>
+                      idx === i
+                        ? {
+                            ...p,
+                            provider: m.provider,
+                            model: m.model,
+                            brandColor: m.brandColor,
+                            modelLabel: m.label,
+                            name: p.name && p.name !== prev[idx].name ? p.name : shortLabel(m.label),
+                          }
+                        : p
+                    )
                   )
-                )
-              }
-            />
-          ))}
-        </div>
+                }
+              />
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center gap-4">
           <button
