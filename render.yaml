@@ -1,0 +1,21 @@
+# Render Blueprint for AI Poker Room (Next.js 14)
+# Deploy: Render dashboard -> New -> Blueprint -> connect this repo.
+# You'll be prompted for the four model API keys (never committed).
+services:
+  - type: web
+    name: ai-poker
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npx next start -p $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+      - key: NODE_VERSION
+        value: "20.18.0"
